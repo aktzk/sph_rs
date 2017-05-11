@@ -1,0 +1,12 @@
+pub const WINDOW_SIZE:(u64, u64) = (600, 600);
+pub const SPH_SCALE:f64 = 200.0;
+pub const SPH_SIZE:(f64, f64) = (WINDOW_SIZE.0 as f64 / SPH_SCALE, WINDOW_SIZE.1 as f64 / SPH_SCALE);
+pub const ONE_SIDE_PARTICLE_COUNT:usize = 60;
+pub const PARTICLE_SPACING:f64 = 1.0 / ONE_SIDE_PARTICLE_COUNT as f64;
+// sph parameters
+pub const REFERENCE_DENSITY:f64 = 1000.0; // rho_0
+pub const STIFFNESS:f64 = 10000.0;
+pub const VISCOSITY:f64 = 12000.0;
+pub const GRAVITY:f64 = 12000.0;
+pub const KERNEL_RANGE:f64 = 2.0 * PARTICLE_SPACING;
+pub const MASS:f64  = PARTICLE_SPACING * PARTICLE_SPACING * REFERENCE_DENSITY;

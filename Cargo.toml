@@ -1,0 +1,8 @@
+[package]
+name = "sph_rs"
+version = "0.1.0"
+authors = ["issk"]
+
+[dependencies]
+cgmath = "*"
+piston_window = "0.61.0"
