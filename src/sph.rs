@@ -15,14 +15,19 @@ impl SPH {
         let left = (constants::SPH_SIZE.0 - 1.0) * 0.5;
         let top = 0.1;
         let mut grid = grid::Grid::new();
+
         for i in 0..constants::ONE_SIDE_PARTICLE_COUNT {
             for j in 0..constants::ONE_SIDE_PARTICLE_COUNT {
-                let pos = Point2::new(left, top) + Vector2::new(i as f64 * constants::PARTICLE_SPACING, j as f64 * constants::PARTICLE_SPACING);
+                let pos = Point2::new(left, top) +
+                          Vector2::new(i as f64 * constants::PARTICLE_SPACING,
+                                       j as f64 * constants::PARTICLE_SPACING);
                 let p = Particle::new(pos, constants::MASS);
                 particles.push(p);
             }
         }
+
         grid.update(&particles);
+
         SPH {
             particles: particles,
             neighborhoods: Vec::new(),
@@ -71,7 +76,7 @@ impl SPH {
             for n in 0..neighbors.len() {
                 let j = neighbors[n];
                 let x = self.particles[i].position - self.particles[j].position;
-                density_sum += self.particles[j].mass * kernel(&x, constants::KERNEL_RANGE);
+                density_sum += self.particles[j].mass * (x, constants::KERNEL_RANGE).kernel();
             }
             self.particles[i].density = density_sum;
         }
@@ -79,7 +84,8 @@ impl SPH {
 
     fn calculate_pressure(&mut self) {
         for p in &mut self.particles {
-            p.pressure = (constants::STIFFNESS * (p.density - constants::REFERENCE_DENSITY)).max(0.0);
+            p.pressure = (constants::STIFFNESS * (p.density - constants::REFERENCE_DENSITY))
+                .max(0.0);
         }
     }
 
@@ -88,22 +94,27 @@ impl SPH {
             let mut f_pressure = Vector2::new(0.0, 0.0);
             let mut f_viscosity = Vector2::new(0.0, 0.0);
             let ref neighbors = self.neighborhoods[i];
+
             for j in neighbors {
                 let j = *j;
                 let x = self.particles[i].position - self.particles[j].position;
                 let inv_density = 1.0 / self.particles[j].density;
+
                 f_pressure += self.particles[j].mass *
-                              (self.particles[i].pressure + self.particles[j].pressure) * 0.5 * inv_density *
-                              grad_kernel(&x, constants::KERNEL_RANGE);
+                              (self.particles[i].pressure + self.particles[j].pressure) *
+                              0.5 * inv_density *
+                              (x, constants::KERNEL_RANGE).grad();
+
                 f_viscosity += self.particles[j].mass *
-                                (self.particles[j].velocity - self.particles[i].velocity) * inv_density *
-                                laplace_kernel(&x, constants::KERNEL_RANGE);
+                               (self.particles[j].velocity - self.particles[i].velocity) *
+                               inv_density *
+                               (x, constants::KERNEL_RANGE).laplace();
             }
-            
+
             f_pressure *= -1.0;
             f_viscosity *= constants::VISCOSITY;
             let f_gravity = self.particles[i].density * Vector2::new(0.0, constants::GRAVITY);
-  
+
             self.particles[i].force = f_pressure + f_viscosity + f_gravity;
         }
     }
@@ -113,35 +124,44 @@ impl SPH {
             p.update(dt, self.wall_left);
         }
     }
-
 }
 
-// 実装においては、x.magnitude() < h が保証されている
-fn kernel(x: &Vector2<f64>, h: f64) -> f64 {
-    use std::f64;
-    let r2 = x.magnitude2();
-    let h2 = h * h;
-    if r2 < 0.0 {
-        return 0.0;
+trait Kernel {
+    fn kernel(&self) -> f64;
+    fn grad(&self) -> Vector2<f64>;
+    fn laplace(&self) -> f64;
+}
+
+impl Kernel for (Vector2<f64>, f64) {
+    fn kernel(&self) -> f64 {
+        use std::f64;
+        let r2 = self.0.magnitude2();
+        let h2 = self.1 * self.1;
+
+        if r2 < 0.0 {
+            return 0.0;
+        }
+
+        315.0 * f64::consts::FRAC_1_PI / (64.0 * self.1.powi(9)) * (h2 - r2).powi(3)
     }
 
-    315.0 * f64::consts::FRAC_1_PI / (64.0  * h.powi(9)) * (h2 - r2).powi(3)
-}
+    fn grad(&self) -> Vector2<f64> {
+        use std::f64;
+        let r = self.0.magnitude();
 
-fn grad_kernel(x: &Vector2<f64>, h:f64)-> Vector2<f64> {
-    use std::f64;
-    let r = x.magnitude();
-    if r == 0.0 {
-        return Vector2::new(0.0,0.0);
+        if r == 0.0 {
+            return Vector2::new(0.0, 0.0);
+        }
+
+        let t1 = -45.0 * f64::consts::FRAC_1_PI / self.1.powi(6);
+        let t2 = self.0 / r;
+        let t3 = (self.1 - r) * (self.1 - r);
+        t1 * t2 * t3
     }
-    let t1 = -45.0 * f64::consts::FRAC_1_PI / h.powi(6);
-    let t2 = x / r;
-    let t3 = (h-r) * (h-r);
-    t1 * t2 * t3
-}
 
-fn laplace_kernel(x: &Vector2<f64>, h: f64) -> f64 {
-    use std::f64;
-    let r = x.magnitude();
-    45.0 * f64::consts::FRAC_1_PI / h.powi(6) * (h-r)
+    fn laplace(&self) -> f64 {
+        use std::f64;
+        let r = self.0.magnitude();
+        45.0 * f64::consts::FRAC_1_PI / self.1.powi(6) * (self.1 - r)
+    }
 }

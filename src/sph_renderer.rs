@@ -28,6 +28,7 @@ impl SPHRenderer {
         let mut update = false;
         let mut initial_mouse_pos = Point2::new(0.0, 0.0);
         let mut temp_wall_left = 0.0;
+
         while let Some(e) = self.window.next() {
             match e {
                 Event::Update(_) => {
